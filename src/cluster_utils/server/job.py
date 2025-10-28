@@ -133,7 +133,8 @@ class Job:
 
         if "conda_env_path" in paths:
             conda_env_activate = (
-                f"pushd && cd && exec conda activate {paths['conda_env_path']} && popd"
+                f'eval "$(conda shell.bash hook)"\n'
+                f"conda activate {paths['conda_env_path']}"
             )
         else:
             conda_env_activate = ""

@@ -130,7 +130,7 @@ These parameters are the same for ``grid_search`` and ``hp_optimization``.
 
     .. confval:: environment_setup.conda_env_path: str
 
-        Name of conda environment to activate (this option might be broken).
+        Name of conda environment to activate.
 
     .. confval:: environment_setup.variables: dict[str]
 

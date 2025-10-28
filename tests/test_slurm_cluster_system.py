@@ -226,3 +226,30 @@ def test_extract_job_status_from_sacct_output__including_intermediate_steps():
         match="Unexpected line in sacct output: 4597753.batch|cpu-short|FAILED|1:0",
     ):
         extract_job_status_from_sacct_output(sacct_output)
+
+
+def test_conda_env_activation(job_data):
+    """Test that conda environment activation command is correctly generated."""
+    job_data.paths["conda_env_path"] = "my-conda-env"
+
+    job_cmd = job_data.job.generate_execution_cmd(job_data.paths)
+
+    # Verify that conda activation commands are present
+    assert 'eval "$(conda shell.bash hook)"' in job_cmd
+    assert "conda activate my-conda-env" in job_cmd
+
+    # Verify that the commands appear in the correct order
+    lines = job_cmd.split("\n")
+    conda_hook_index = None
+    conda_activate_index = None
+
+    for i, line in enumerate(lines):
+        if 'eval "$(conda shell.bash hook)"' in line:
+            conda_hook_index = i
+        if "conda activate my-conda-env" in line:
+            conda_activate_index = i
+
+    assert conda_hook_index is not None, "conda hook command not found"
+    assert conda_activate_index is not None, "conda activate command not found"
+    assert conda_hook_index < conda_activate_index, \
+        "conda hook must come before conda activate"
