@@ -4,217 +4,210 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`cluster_utils` is a Python package for simplifying interaction with compute clusters (Slurm, HTCondor) for machine learning research. It manages grid searches, hyperparameter optimization, job submission, monitoring, and result aggregation. Developed by the Autonomous Learning group at the University of Tübingen.
+**cluster_utils** is a Python package for managing compute cluster jobs, designed for machine learning research workflows. It provides a client-server architecture where:
+
+- **Client**: Job scripts that execute on cluster nodes, instrumented to communicate with the server
+- **Server**: Main process that orchestrates job submission, monitoring, and result aggregation
+
+Supports multiple cluster backends: Slurm, HTCondor, and local execution.
 
 ## Installation
 
 ```bash
-# For client-side only (jobs that run on cluster)
+# Basic installation (client only)
 pip install .
 
-# For server-side (running grid_search/hp_optimization)
+# Full installation with server/runner capabilities
 pip install ".[runner]"
 
-# For all features including report generation
-pip install ".[all]"
-
-# For development
+# Development installation with all tools
 pip install ".[all-dev]"
 ```
 
-## Testing Commands
+## Common Commands
+
+### Running Tests
 
 ```bash
-# Run linting
-nox -t lint
+# Run all tests with nox (tests across Python 3.8-3.13)
+nox
 
-# Run type checking
-nox -s mypy
-
-# Run unit tests
+# Run specific test suite
 nox -s pytest
-
-# Run all integration tests
+nox -s lint
+nox -s mypy
 nox -s integration_tests
 
-# Run integration tests with report generation
-nox -s integration_tests_with_report_generation
-
-# Run integration tests with nevergrad optimizer
-nox -s integration_tests_with_nevergrad
-
-# Run integration tests with virtualenv
-nox -s integration_tests_with_venv
-
-# Run specific test file
-pytest tests/test_utils.py
-
-# Run all tests for all Python versions
-nox
+# Run pytest directly (single Python version)
+pytest
 ```
 
-## Code Formatting and Linting
+### Linting and Formatting
 
 ```bash
+# Check code formatting
+black --check .
+
 # Format code
 black .
 
-# Check formatting
-black --check .
-
-# Lint code
+# Run linter
 ruff check .
 
 # Type checking
 mypy .
 ```
 
-## Usage Commands
-
-### Grid Search
+### Running Grid Search or Hyperparameter Optimization
 
 ```bash
-python -m cluster_utils.grid_search examples/basic/grid_search.json
+# Grid search
+python3 -m cluster_utils.grid_search <config.json>
+
+# Hyperparameter optimization
+python3 -m cluster_utils.hp_optimization <config.json>
+
+# Examples
+python3 -m cluster_utils.grid_search examples/basic/grid_search.json
+python3 -m cluster_utils.hp_optimization examples/basic/optimization_metaopt.json
 ```
 
-### Hyperparameter Optimization
+## Code Architecture
 
-```bash
-python -m cluster_utils.hp_optimization examples/basic/optimization_metaopt.json
-```
+### Client-Server Communication Model
 
-### Generate Report from Results
+The package uses a socket-based communication protocol between job scripts (clients) and the orchestration process (server):
 
-```bash
-python -m cluster_utils.scripts.generate_report <results_directory>
-```
+1. **Job Initialization**: `initialize_job()` reads parameters and registers with server
+2. **Job Execution**: User code runs with provided parameters
+3. **Job Finalization**: `finalize_job()` saves metrics and reports back to server
 
-### Plot Job Timeline
+### Key Modules
 
-```bash
-cluster_utils_plot_timeline <path_to_cluster_run_log>
-```
+**Client Side** (`src/cluster_utils/client/`):
+- `__init__.py`: Main client API (`initialize_job`, `finalize_job`, `cluster_main` decorator)
+- `server_communication.py`: Socket communication with server
+- `submission_state.py`: Tracks job connection state
 
-## Architecture Overview
+**Server Side** (`src/cluster_utils/server/`):
+- `job_manager.py`: Core orchestration logic for grid search and hyperparameter optimization
+- `cluster_system.py`: Abstract interface for cluster backends
+- `slurm_cluster_system.py`: Slurm-specific implementation
+- `condor_cluster_system.py`: HTCondor-specific implementation
+- `dummy_cluster_system.py`: Local execution (no cluster)
+- `optimizers.py`: Hyperparameter optimization algorithms
+- `communication_server.py`: Server-side socket handling
+- `git_utils.py`: Clones and checks out specified git commit for reproducibility
+- `report.py`: PDF report generation with results and plots
 
-### Client-Server Model
+**Configuration** (`src/cluster_utils/base/`):
+- Uses `smart_settings` library for flexible JSON/TOML/YAML configuration
+- `settings.py`: Configuration schemas and validation
 
-The package uses a **client-server architecture** where:
+### Two Main Entry Points
 
-- **Server**: Runs on the cluster login node, manages job submission, monitoring, and optimization
-- **Client**: Code that runs within each cluster job, communicates results back to server via UDP sockets
+1. **`grid_search.py`**: Exhaustive grid search over hyperparameter combinations
+   - Takes `hyperparam_list` with discrete `values` for each parameter
+   - Submits all combinations as separate jobs
 
-### Package Structure
+2. **`hp_optimization.py`**: Iterative hyperparameter optimization
+   - Takes `optimized_params` with continuous distributions
+   - Uses optimization algorithms (CEM, Nevergrad) to sample promising regions
+   - Supports early stopping of unpromising jobs
 
-- `src/cluster_utils/base/`: Shared code between client and server (constants, communication, settings)
-- `src/cluster_utils/client/`: Client-side code for jobs running on cluster
-  - `server_communication.py`: UDP socket communication with server
-  - `submission_state.py`: Maintains job state (id, server IP/port)
-- `src/cluster_utils/server/`: Server-side code for managing cluster runs
-  - `job_manager.py`: Core logic for grid search and hyperparameter optimization
-  - `cluster_system.py`: Abstract interface for cluster backends
-  - `slurm_cluster_system.py`: Slurm implementation
-  - `condor_cluster_system.py`: HTCondor implementation
-  - `dummy_cluster_system.py`: Local execution for testing
-  - `communication_server.py`: UDP server receiving messages from jobs
-  - `optimizers.py`: Hyperparameter optimization algorithms
-  - `data_analysis.py`: Result aggregation and analysis
-  - `report.py`, `latex_utils.py`: PDF report generation
-- `src/cluster_utils/grid_search.py`: Entry point for grid search
-- `src/cluster_utils/hp_optimization.py`: Entry point for hyperparameter optimization
-- `src/cluster/`: Legacy package name (deprecated, redirects to cluster_utils)
+### Configuration Files
 
-### Client API
+Configuration JSON/TOML files specify:
+- `optimization_procedure_name`: Experiment identifier
+- `results_dir`: Where to store results
+- `git_params`: Branch/commit to checkout for reproducibility
+- `script_relative_path`: Job script to execute (relative to git repo root)
+- `environment_setup`: Pre-job scripts and environment variables
+- `cluster_requirements`: CPUs, GPUs, memory, node constraints
+- `fixed_params`: Parameters passed to all jobs
+- `hyperparam_list` (grid search) or `optimized_params` (hp optimization): Parameters to vary
 
-Jobs communicate with cluster_utils using two patterns:
+### Job Script Instrumentation
 
-**Decorator pattern:**
+Two patterns for instrumenting job scripts:
+
+**Pattern 1: Decorator** (simplest):
 ```python
 from cluster_utils import cluster_main
 
 @cluster_main
 def main(working_dir, id, **kwargs):
-    # working_dir: directory for results/checkpoints
-    # id: unique job identifier
-    # kwargs: user-defined parameters from config
-    results = {"metric": value}
-    return results  # Sent to server automatically
+    # Your code here
+    return {"metric": value}
 ```
 
-**Manual pattern:**
+**Pattern 2: Explicit calls** (more control):
 ```python
-import cluster_utils
+from cluster_utils import initialize_job, finalize_job
 
-params = cluster_utils.initialize_job()  # Get parameters and establish connection
-results = {"metric": value}
-cluster_utils.finalize_job(results)  # Send results to server
+params = initialize_job()
+# Your code here
+metrics = {"metric": value}
+finalize_job(metrics, params)
 ```
 
-**Additional client functions:**
-- `exit_for_resume()`: Exit with special code to trigger job resubmission
-- `announce_fraction_finished(fraction)`: Report progress
-- `announce_early_results(results)`: Send intermediate results
+### Result Collection
 
-### Configuration Files
+Results are aggregated in:
+- `full_df.csv`: All job results with parameters and metrics
+- Individual job directories with `cluster_params.csv` and `cluster_metrics.csv`
+- Optional PDF reports with plots and analysis
 
-JSON configuration files specify:
-- `optimization_procedure_name`: Name for this run
-- `results_dir`: Where to store results
-- `git_params`: Branch and commit to clone (for reproducibility)
-- `script_relative_path`: Path to Python script to execute
-- `cluster_requirements`: CPU/GPU/memory requirements
-- `environment_setup`: Environment variables, pre-job scripts
-- `fixed_params`: Parameters passed to all jobs
-- `hyperparam_list` (grid search): Parameter values to iterate over
-- `optimized_params` (hp optimization): Parameter distributions for optimization
-- `optimization_setting` (hp optimization): Metric to optimize, number of samples, etc.
-- `optimizer_str` (hp optimization): Optimizer algorithm (e.g., "cem_metaoptimizer", "nevergrad")
+### Reproducibility Features
 
-See `examples/basic/grid_search.json` and `examples/basic/optimization_metaopt.json` for complete examples.
+- **Git integration**: Jobs run from a fresh `git clone` at specified commit
+- **Parameter archiving**: All parameters saved as JSON in job working directory
+- **Environment capture**: Can specify exact Python environment or virtual environment setup
 
-### Job Lifecycle
+### Checkpointing and Resuming
 
-1. Server parses config and creates job specifications
-2. Server clones git repository to isolated directory
-3. Server submits jobs to cluster with generated run scripts
-4. Jobs execute and communicate results via UDP to server
-5. Server aggregates results, updates optimization state
-6. For hp_optimization: server proposes new hyperparameters for next iteration
-7. Server generates reports (CSV, optional PDF)
-
-### Hyperparameter Distributions
-
-Supported distributions for hp_optimization:
-- `TruncatedNormal`: Normal distribution with bounds
-- `TruncatedLogNormal`: Log-normal distribution with bounds
-- `IntNormal`: Integer-valued normal distribution
-- `IntLogNormal`: Integer-valued log-normal distribution
-- `Discrete`: Discrete set of options
-
-### Optimizers
-
-Available optimization algorithms:
-- `cem_metaoptimizer`: Cross-Entropy Method
-- `nevergrad`: Integration with Nevergrad optimization library (requires `pip install ".[nevergrad]"`)
-
-### Environment Setup
-
-The Python environment can be specified via:
-1. Activate environment before running `python -m cluster_utils.grid_search` (simplest)
-2. `environment_setup.pre_job_script`: Shell script to source before job
-3. `environment_setup.variables`: Environment variables to set
-4. Virtualenv/conda environment creation (see config documentation)
-
-**Important**: If your local package is installed in the environment, it may override the git clone. Consider using `environment_setup` options for clean reproducibility.
+Jobs can use `exit_for_resume()` to split long-running tasks:
+1. Save checkpoint to `working_dir`
+2. Call `exit_for_resume()`
+3. Job exits with special return code
+4. cluster_utils resubmits job, which loads checkpoint and continues
 
 ## Development Notes
 
-- The package uses `setuptools_scm` for versioning based on git tags
-- Dependencies are split: `base` and `client` have minimal deps, `server` requires `runner` optional dependencies
-- `src/cluster/` exists for backward compatibility (redirects to `cluster_utils`)
-- Communication uses UDP sockets for fault tolerance (fire-and-forget messaging)
-- Jobs have special exit code (defined in `RETURN_CODE_FOR_RESUME`) to trigger automatic resubmission
-- Slurm job states are monitored via `sacct` command
-- The server runs with progress bars (using `tqdm`) showing submitted/running/completed jobs
-- Reports can be generated at different times: "never", "when_finished", or "every_iteration"
-- Git integration ensures all jobs run from a clean clone at specified commit for reproducibility
+### Package Structure
+
+- Minimal dependencies for client (jobs don't need scipy, pandas, etc.)
+- Optional dependencies for server via `[runner]` extra
+- Three sub-packages: `base` (shared), `client` (jobs), `server` (orchestration)
+
+### Testing
+
+- Unit tests in `tests/test_*.py`
+- Integration tests in `tests/run_integration_tests.sh` and similar
+- Tests use local cluster backend (no actual Slurm/HTCondor needed)
+- `noxfile.py` defines test matrix across Python versions
+
+### Adding New Cluster Backend
+
+Subclass `ClusterSystem` in `server/cluster_system.py` and implement:
+- `submit_job()`: Submit job and return job ID
+- `terminate_job()`: Cancel running job
+- `get_job_state()`: Query job status
+- `get_job_infos()`: Get detailed job information
+
+### Optional Dependencies
+
+- `[runner]`: Server dependencies (pandas, numpy, scipy, tqdm, gitpython)
+- `[report]`: PDF report generation (matplotlib, seaborn, scikit-learn)
+- `[nevergrad]`: Nevergrad-based hyperparameter optimization
+- `[dev]`: Development tools (nox, pre-commit, linters)
+- `[test]`: Testing tools (pytest)
+- `[mypy]`: Type checking
+
+## Examples
+
+See `examples/` directory:
+- `examples/basic/`: Simple toy optimization problem with various configuration examples
+- `examples/rosenbrock/`: Classic optimization benchmark
+- `examples/checkpointing/`: Demonstrates checkpointing and resuming
+- `examples/slurm_timeout_signal/`: Handling Slurm timeout signals gracefully
