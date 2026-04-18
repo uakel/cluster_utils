@@ -24,6 +24,7 @@ num_jobs_in_elite = 10
 
 [environment_setup]
 virtual_env_path = "/mnt/lustre/work/martius/mot191/.miniconda3/envs/depRLCaT"
+custom_python_executable_path = "/mnt/lustre/work/martius/mot191/.miniconda3/envs/depRLCaT/bin/python"
 
 [singularity]
 image = "/mnt/lustre/work/martius/mot191/containers/scone.sif"
