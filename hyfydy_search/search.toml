@@ -1,0 +1,96 @@
+optimization_procedure_name = "hyfydy_cost_limit_search"
+results_dir = "/mnt/lustre/work/martius/mot191/param_search/hyfydy_cost_limits/"
+generate_report = "when_finished"
+script_relative_path = "cluster_utils/hyfydy_search/train_for_search.py"
+num_best_jobs_whose_data_is_kept = 20
+run_in_working_dir = true
+local_run = false
+optimizer_str = "cem_metaoptimizer"
+
+[cluster_requirements]
+partition = "2080-galvani"
+request_cpus = 8
+request_gpus = 1
+memory_in_mb = 32000
+request_time = "2-00:00:00"
+extra_submission_options = [
+    "--mail-type=FAIL",
+    "--mail-user=leonard.franz@student.uni-tuebingen.de",
+]
+
+[optimizer_settings]
+with_restarts = false
+num_jobs_in_elite = 10
+
+[environment_setup]
+virtual_env_path = "/mnt/lustre/work/martius/mot191/.miniconda3/envs/depRLCaT"
+
+[optimization_setting]
+metric_to_optimize = "score"
+number_of_samples = 160
+n_jobs_per_iteration = 32
+minimize = false
+run_local = false
+
+[fixed_params]
+min_velocity_cost_coeff = 1.0
+grf_cost_coeff = 1.0
+hip_limit_cost_coeff = 1.0
+knee_limit_cost_coeff = 1.0
+ankle_limit_cost_coeff = 1.0
+lumbar_limit_cost_coeff = 1.0
+
+[[optimized_params]]
+param = "max_velocity_cost_coeff"
+distribution = "Discrete"
+options = [0.0, 1.0]
+
+[[optimized_params]]
+param = "nmuscle_cost_coeff"
+distribution = "Discrete"
+options = [0.0, 1.0]
+
+[[optimized_params]]
+param = "smooth_cost_coeff"
+distribution = "Discrete"
+options = [0.0, 1.0]
+
+[[optimized_params]]
+param = "target_grf"
+distribution = "Discrete"
+options = [1.2375, 1.3, 1.4]
+
+[[optimized_params]]
+param = "target_delta"
+distribution = "Discrete"
+options = [0.05, 0.1, 0.2, 0.25]
+
+[[optimized_params]]
+param = "target_muscle_usage_percentage"
+distribution = "Discrete"
+options = [0.28, 0.33, 0.4, 0.5]
+
+[[optimized_params]]
+param = "target_hip_torque"
+distribution = "Discrete"
+options = [5, 10, 20, 40, 80]
+
+[[optimized_params]]
+param = "target_knee_torque"
+distribution = "Discrete"
+options = [5, 10, 20, 40, 80]
+
+[[optimized_params]]
+param = "target_ankle_torque"
+distribution = "Discrete"
+options = [5, 10, 20, 40, 80]
+
+[[optimized_params]]
+param = "target_lumbar_torque_trunk"
+distribution = "Discrete"
+options = [5, 10, 20, 40, 80]
+
+[[optimized_params]]
+param = "target_lumbar_torque_offset"
+distribution = "Discrete"
+options = [0, 10, 20, 40, 80]
