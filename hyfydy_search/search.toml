@@ -26,8 +26,9 @@ num_jobs_in_elite = 10
 virtual_env_path = "/mnt/lustre/work/martius/mot191/.miniconda3/envs/depRLCaT"
 
 [singularity]
-image = "/mnt/lustre/work/martius/mot191/containers/scone_mount.sif"
-use_run = true
+image = "/mnt/lustre/work/martius/mot191/containers/scone.sif"
+use_run = false
+args = ["--bind=/mnt/lustre/work/martius/mot191"]
 
 [optimization_setting]
 metric_to_optimize = "score"
