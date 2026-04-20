@@ -6,7 +6,7 @@ via `deprl.main.train`, and reports the mean of `test/gait_match/overall`
 across all logged test epochs as the objective `score`.
 
 Early kill: once the agent has been trained for >= 15M steps, the first test
-epoch whose mean `test/episode_length` is below 100 aborts the run and
+epoch whose mean `test/episode_length` is below 800 aborts the run and
 reports score 0.
 """
 
@@ -27,6 +27,7 @@ from deprl.vendor.tonic.utils.logger import Logger
 
 TEMPLATE_PATH = Path(__file__).parent / "template.yaml"
 ENV_NAMES = ("h0918", "h1622", "h2190")
+NUM_ACTS = {"h0918": 18, "h1622": 22, "h2190": 90}
 EARLY_KILL_STEP = 15_000_000
 EARLY_KILL_MIN_EPISODE_LEN = 800
 
@@ -59,6 +60,9 @@ def build_config(template: Dict[str, Any], params: Any, env_name: str) -> Dict[s
 
     cfg["tonic"]["environment"] = (
         f"deprl.environments.Gym('sconerun_{env_name}_cat-v0', scaled_actions=False)"
+    )
+    cfg["tonic"]["agent"] = cfg["tonic"]["agent"].replace(
+        "__NUM_ACTS__", str(NUM_ACTS[env_name])
     )
     cfg["tonic"]["name"] = f"hyfydy_search_{env_name}_{params['id']}"
     cfg["tonic"]["seed"] = 0
@@ -109,9 +113,10 @@ def compute_score() -> float:
     col = "test/gait_match/overall/mean"
     if col not in df.columns:
         col = "test/gait_match/overall"
-    if col not in df.columns:
+    if col not in df.columns or "train/steps" not in df.columns:
         return 0.0
-    values = pd.to_numeric(df[col], errors="coerce").dropna()
+    mask = pd.to_numeric(df["train/steps"], errors="coerce") >= EARLY_KILL_STEP
+    values = pd.to_numeric(df.loc[mask, col], errors="coerce").dropna()
     if len(values) == 0:
         return 0.0
     return float(values.mean())
@@ -120,7 +125,7 @@ def compute_score() -> float:
 def main() -> None:
     params = initialize_job()
 
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(int(params["id"]))
     env_name = str(rng.choice(ENV_NAMES))
 
     with open(TEMPLATE_PATH, "r") as f:

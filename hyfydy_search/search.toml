@@ -29,7 +29,7 @@ custom_python_executable_path = "/mnt/lustre/work/martius/mot191/.miniconda3/env
 [singularity]
 image = "/mnt/lustre/work/martius/mot191/containers/scone.sif"
 use_run = false
-args = ["--bind=/mnt/lustre/work/martius/mot191"]
+args = ["--nv", "--bind=/mnt/lustre/work/martius/mot191"]
 
 [optimization_setting]
 metric_to_optimize = "score"
@@ -45,6 +45,7 @@ hip_limit_cost_coeff = 1.0
 knee_limit_cost_coeff = 1.0
 ankle_limit_cost_coeff = 1.0
 lumbar_limit_cost_coeff = 1.0
+smooth_cost_coeff = 0.0
 
 [[optimized_params]]
 param = "max_velocity_cost_coeff"
@@ -57,19 +58,9 @@ distribution = "Discrete"
 options = [0.0, 1.0]
 
 [[optimized_params]]
-param = "smooth_cost_coeff"
-distribution = "Discrete"
-options = [0.0, 1.0]
-
-[[optimized_params]]
 param = "target_grf"
 distribution = "Discrete"
 options = [1.2375, 1.3, 1.4]
-
-[[optimized_params]]
-param = "target_delta"
-distribution = "Discrete"
-options = [0.05, 0.1, 0.2, 0.25]
 
 [[optimized_params]]
 param = "target_muscle_usage_percentage"
