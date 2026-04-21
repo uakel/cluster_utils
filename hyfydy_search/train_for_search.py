@@ -5,9 +5,9 @@ patches `template.yaml` with the params cluster_utils provides, runs training
 via `deprl.main.train`, and reports the mean of `test/gait_match/overall`
 across all logged test epochs as the objective `score`.
 
-Early kill: once the agent has been trained for >= 15M steps, the first test
-epoch whose mean `test/episode_length` is below 800 aborts the run and
-reports score 0.
+Early kill: at the first test epoch reached at >= 15M steps, check once
+whether mean `test/episode_length` is below 600. If so, abort and report
+score 0. No further kill checks are performed after that single decision.
 """
 
 import copy
@@ -29,9 +29,9 @@ TEMPLATE_PATH = Path(__file__).parent / "template.yaml"
 ENV_NAMES = ("h0918", "h1622", "h2190")
 NUM_ACTS = {"h0918": 18, "h1622": 22, "h2190": 90}
 EARLY_KILL_STEP = 15_000_000
-EARLY_KILL_MIN_EPISODE_LEN = 800
+EARLY_KILL_MIN_EPISODE_LEN = 600
 
-EARLY_KILL_STATE = {"triggered": False, "reason": ""}
+EARLY_KILL_STATE = {"triggered": False, "checked": False, "reason": ""}
 
 COST_COEFF_KEYS = (
     "min_velocity_cost_coeff",
@@ -91,13 +91,16 @@ def install_early_kill() -> None:
         train_steps_vals = list(self.epoch_dict.get("train/steps", []))
         ep_len_vals = list(self.epoch_dict.get("test/episode_length", []))
         original_dump(self)
-        if EARLY_KILL_STATE["triggered"]:
+        if EARLY_KILL_STATE["checked"]:
             return
         if not train_steps_vals or not ep_len_vals:
             return
         latest_step = float(np.mean(train_steps_vals))
+        if latest_step < EARLY_KILL_STEP:
+            return
         latest_len = float(np.mean(ep_len_vals))
-        if latest_step >= EARLY_KILL_STEP and latest_len < EARLY_KILL_MIN_EPISODE_LEN:
+        EARLY_KILL_STATE["checked"] = True
+        if latest_len < EARLY_KILL_MIN_EPISODE_LEN:
             EARLY_KILL_STATE["triggered"] = True
             EARLY_KILL_STATE["reason"] = (
                 f"test/episode_length={latest_len:.1f} < "
