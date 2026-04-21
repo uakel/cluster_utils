@@ -20,7 +20,7 @@ import yaml
 
 from cluster_utils import finalize_job, initialize_job
 
-from deprl.main import train
+from deprl.main import set_tensor_device, train
 from deprl.vendor.tonic.utils import logger as tonic_logger
 from deprl.vendor.tonic.utils.logger import Logger
 
@@ -76,6 +76,9 @@ def build_config(template: Dict[str, Any], params: Any, env_name: str) -> Dict[s
     cfg["env_args"]["target_lumbar_torque"] = (
         trunk if env_name == "h2190" else trunk + offset
     )
+
+    if env_name != "h2190":
+        cfg.pop("mpo_args", None)
 
     return cfg
 
@@ -134,6 +137,7 @@ def main() -> None:
 
     install_early_kill()
 
+    set_tensor_device()
     train(config)
 
     if EARLY_KILL_STATE["triggered"]:

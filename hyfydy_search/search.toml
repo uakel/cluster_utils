@@ -75,7 +75,7 @@ options = [5, 10, 20, 40, 80]
 [[optimized_params]]
 param = "target_knee_torque"
 distribution = "Discrete"
-options = [5, 10, 20, 40, 80]
+options = [10, 20, 40, 80]
 
 [[optimized_params]]
 param = "target_ankle_torque"
